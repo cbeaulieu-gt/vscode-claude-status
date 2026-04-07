@@ -17,6 +17,9 @@ out/
 # Yeoman generator boilerplate (not useful for contributors)
 vsc-extension-quickstart.md
 
+# Git worktrees (isolated workspaces for feature branches)
+.worktrees/
+
 # OS
 .DS_Store
 Thumbs.db
