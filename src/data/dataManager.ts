@@ -136,11 +136,14 @@ export class DataManager {
     return {
       utilization5h: usageData.utilization5h,
       utilization7d: usageData.utilization7d,
+      utilization7dSonnet: 0,
       resetIn5h: Math.max(0, usageData.reset5hAt - nowSec),
       resetIn7d: Math.max(0, usageData.reset7dAt - nowSec),
+      resetIn7dSonnet: 0,
       limitStatus: usageData.limitStatus as RateLimitData['limitStatus'],
       // Derive from cached reset timestamp: non-zero means a 7d limit exists
       has7dLimit: usageData.reset7dAt > 0,
+      has7dSonnetLimit: false,
     };
   }
 
