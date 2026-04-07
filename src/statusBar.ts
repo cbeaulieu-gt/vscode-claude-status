@@ -38,7 +38,11 @@ function truncateName(name: string): string {
 }
 
 export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
-  const { dataSource, utilization5h, utilization7d, limitStatus, cost5h, cost7d, cacheAge, has7dLimit, providerType } = data;
+  const {
+    dataSource, utilization5h, utilization7d, utilization7dSonnet,
+    limitStatus, cost5h, cost7d, cacheAge,
+    has7dLimit, has7dSonnetLimit, providerType,
+  } = data;
   const displayMode = config.displayMode;
 
   if (dataSource === 'no-credentials') {
@@ -56,15 +60,18 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
 
   let part5h: string;
   let part7d: string;
+  let partSonnet: string;
 
   if (useCostMode) {
     part5h = `5h:$${cost5h.toFixed(2)}`;
     part7d = ` 7d:$${cost7d.toFixed(2)}`;
+    partSonnet = '';
   } else {
     // percent mode — Claude.ai only
     if (limitStatus === 'denied') {
       part5h = `5h:100%✗`;
       part7d = '';
+      partSonnet = '';
     } else {
       const warn5h = utilization5h >= 0.75 ? '⚠' : '';
       part5h = `5h:${formatPercent(utilization5h)}${warn5h}`;
@@ -73,6 +80,12 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
         part7d = ` 7d:${formatPercent(utilization7d)}${warn7d}`;
       } else {
         part7d = '';
+      }
+      if (has7dSonnetLimit) {
+        const warnSonnet = utilization7dSonnet >= 0.75 ? '⚠' : '';
+        partSonnet = ` S7d:${formatPercent(utilization7dSonnet)}${warnSonnet}`;
+      } else {
+        partSonnet = '';
       }
     }
   }
@@ -91,15 +104,16 @@ export function buildLabel(data: ClaudeUsageData, projectCosts: ProjectCostData[
     }
   }
 
-  const main = `🤖 ${part5h}${part7d}${projectPart}`;
+  const main = `🤖 ${part5h}${part7d}${partSonnet}${projectPart}`;
   return isStale ? `${main}${staleSuffix}` : main;
 }
 
 export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostData[] = []): string {
   const {
-    utilization5h, utilization7d, resetIn5h, resetIn7d,
+    utilization5h, utilization7d, utilization7dSonnet,
+    resetIn5h, resetIn7d, resetIn7dSonnet,
     cost5h, costDay, cost7d, tokensIn5h, tokensOut5h,
-    cacheAge, dataSource, has7dLimit, providerType,
+    cacheAge, dataSource, has7dLimit, has7dSonnetLimit, providerType,
   } = data;
 
   if (dataSource === 'no-credentials') {
@@ -125,6 +139,10 @@ export function buildTooltip(data: ClaudeUsageData, projectCosts: ProjectCostDat
     if (has7dLimit) {
       const bar7d = buildBar(utilization7d, 8);
       lines.push(`7d window:   ${formatPercent(utilization7d)} [${bar7d}] resets in ${formatDuration(resetIn7d)}`);
+    }
+    if (has7dSonnetLimit) {
+      const barSonnet = buildBar(utilization7dSonnet, 8);
+      lines.push(`Sonnet 7d:   ${formatPercent(utilization7dSonnet)} [${barSonnet}] resets in ${formatDuration(resetIn7dSonnet)}`);
     }
     lines.push('');
   } else {

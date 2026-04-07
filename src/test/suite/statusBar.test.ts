@@ -132,4 +132,42 @@ suite('StatusBar', () => {
     const tooltip = buildTooltip(makeData({ dataSource: 'no-credentials' }));
     assert.ok(tooltip.includes('not logged in') || tooltip.includes('Not logged'), tooltip);
   });
+
+  test('buildLabel includes S7d when has7dSonnetLimit is true', () => {
+    const label = buildLabel(makeData({ has7dSonnetLimit: true, utilization7dSonnet: 0.40 }));
+    assert.ok(label.includes('S7d:'), `Expected S7d: in: ${label}`);
+    assert.ok(label.includes('40%'), `Expected 40% in: ${label}`);
+  });
+
+  test('buildLabel omits S7d when has7dSonnetLimit is false', () => {
+    const label = buildLabel(makeData({ has7dSonnetLimit: false }));
+    assert.ok(!label.includes('S7d'), `Expected no S7d in: ${label}`);
+  });
+
+  test('buildLabel shows ⚠ on S7d when Sonnet utilization >= 75%', () => {
+    const label = buildLabel(makeData({
+      has7dSonnetLimit: true,
+      utilization7dSonnet: 0.80,
+      limitStatus: 'allowed_warning',
+    }));
+    const s7dIdx = label.indexOf('S7d:');
+    assert.ok(s7dIdx >= 0, `Expected S7d: in: ${label}`);
+    const afterS7d = label.slice(s7dIdx);
+    assert.ok(afterS7d.includes('⚠'), `Expected ⚠ after S7d in: ${afterS7d}`);
+  });
+
+  test('buildTooltip shows Sonnet 7d window line when present', () => {
+    const tooltip = buildTooltip(makeData({
+      has7dSonnetLimit: true,
+      utilization7dSonnet: 0.65,
+      resetIn7dSonnet: 172800,
+    }));
+    assert.ok(tooltip.includes('Sonnet 7d'), `Expected Sonnet 7d in tooltip: ${tooltip}`);
+    assert.ok(tooltip.includes('65%'), `Expected 65% in tooltip: ${tooltip}`);
+  });
+
+  test('buildTooltip omits Sonnet 7d line when has7dSonnetLimit is false', () => {
+    const tooltip = buildTooltip(makeData({ has7dSonnetLimit: false }));
+    assert.ok(!tooltip.includes('Sonnet 7d'), `Expected no Sonnet 7d in tooltip: ${tooltip}`);
+  });
 });
