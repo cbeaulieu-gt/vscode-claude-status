@@ -4,15 +4,17 @@ import * as os from 'os';
 import { RateLimitData } from './apiClient';
 
 interface CacheFile {
-  version: 2
+  version: 2 | 3
   updatedAt: string
   usageData: {
     utilization5h: number
     utilization7d: number
+    utilization7dSonnet?: number   // Added in v3; absent in v2
     // Unix timestamps in seconds (absolute, not relative) so that remaining
     // time can be recalculated correctly after reading a stale cache entry.
     reset5hAt: number
     reset7dAt: number
+    reset7dSonnetAt?: number       // Added in v3; absent in v2
     limitStatus: string
   }
 }
@@ -25,7 +27,8 @@ export async function readCache(): Promise<CacheFile | null> {
   try {
     const content = await fs.readFile(getCachePath(), 'utf-8');
     const parsed = JSON.parse(content) as CacheFile;
-    if (parsed.version !== 2) { return null; }  // v1 caches used relative times; reject them
+    // Accept v2 (legacy) and v3 (with Sonnet fields); reject v1
+    if (parsed.version !== 2 && parsed.version !== 3) { return null; }
     return parsed;
   } catch {
     return null;
@@ -35,14 +38,15 @@ export async function readCache(): Promise<CacheFile | null> {
 export async function writeCache(data: RateLimitData): Promise<void> {
   const nowSec = Date.now() / 1000;
   const cache: CacheFile = {
-    version: 2,
+    version: 3,
     updatedAt: new Date().toISOString(),
     usageData: {
       utilization5h: data.utilization5h,
       utilization7d: data.utilization7d,
-      // Store absolute reset timestamps so remaining time stays correct
+      utilization7dSonnet: data.utilization7dSonnet,
       reset5hAt: nowSec + data.resetIn5h,
       reset7dAt: nowSec + data.resetIn7d,
+      reset7dSonnetAt: nowSec + data.resetIn7dSonnet,
       limitStatus: data.limitStatus,
     },
   };
