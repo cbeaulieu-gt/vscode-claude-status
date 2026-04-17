@@ -15,14 +15,17 @@ export interface ClaudeUsageData {
   // From API / cache
   utilization5h: number
   utilization7d: number
+  utilization7dSonnet: number
   resetIn5h: number
   resetIn7d: number
+  resetIn7dSonnet: number
   limitStatus: 'allowed' | 'allowed_warning' | 'denied'
 
   // From local JSONL
   cost5h: number
   costDay: number
   cost7d: number
+  costSonnet7d: number
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number
@@ -30,6 +33,7 @@ export interface ClaudeUsageData {
 
   // Rate limit metadata
   has7dLimit: boolean      // false for plans without a 7d window or non-Claude.ai providers
+  has7dSonnetLimit: boolean
   providerType: ClaudeProvider
 
   // Metadata
@@ -110,10 +114,13 @@ export class DataManager {
     const data: ClaudeUsageData = {
       utilization5h: rateLimitData?.utilization5h ?? 0,
       utilization7d: rateLimitData?.utilization7d ?? 0,
+      utilization7dSonnet: rateLimitData?.utilization7dSonnet ?? 0,
       resetIn5h: rateLimitData?.resetIn5h ?? 0,
       resetIn7d: rateLimitData?.resetIn7d ?? 0,
+      resetIn7dSonnet: rateLimitData?.resetIn7dSonnet ?? 0,
       limitStatus: rateLimitData?.limitStatus ?? 'allowed',
       has7dLimit: rateLimitData?.has7dLimit ?? false,
+      has7dSonnetLimit: rateLimitData?.has7dSonnetLimit ?? false,
       providerType,
       ...localUsage,
       lastUpdated: new Date(),
@@ -128,19 +135,23 @@ export class DataManager {
   private cacheToRateLimitData(usageData: {
     utilization5h: number
     utilization7d: number
+    utilization7dSonnet?: number
     reset5hAt: number
     reset7dAt: number
+    reset7dSonnetAt?: number
     limitStatus: string
   }): RateLimitData {
     const nowSec = Date.now() / 1000;
     return {
       utilization5h: usageData.utilization5h,
       utilization7d: usageData.utilization7d,
+      utilization7dSonnet: usageData.utilization7dSonnet ?? 0,
       resetIn5h: Math.max(0, usageData.reset5hAt - nowSec),
       resetIn7d: Math.max(0, usageData.reset7dAt - nowSec),
+      resetIn7dSonnet: Math.max(0, (usageData.reset7dSonnetAt ?? 0) - nowSec),
       limitStatus: usageData.limitStatus as RateLimitData['limitStatus'],
-      // Derive from cached reset timestamp: non-zero means a 7d limit exists
       has7dLimit: usageData.reset7dAt > 0,
+      has7dSonnetLimit: (usageData.reset7dSonnetAt ?? 0) > 0,
     };
   }
 
@@ -226,6 +237,9 @@ export class DataManager {
         this.lastData.cost5h,
         this.lastData.costDay,
         config.dailyBudget,
+        this.lastData.utilization7dSonnet,
+        this.lastData.resetIn7dSonnet,
+        this.lastData.costSonnet7d,
       );
       this.lastPrediction = prediction;
       return prediction;

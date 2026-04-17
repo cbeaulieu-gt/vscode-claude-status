@@ -181,15 +181,19 @@ const response = await fetch('https://api.anthropic.com/v1/messages', {
 ### Rate Limit Headers to Extract
 
 ```
-anthropic-ratelimit-unified-5h-utilization  → util5h  (float, e.g. "0.78")
-anthropic-ratelimit-unified-5h-reset        → Unix timestamp SECONDS (not ISO string)
-anthropic-ratelimit-unified-5h-status       → "allowed" or "denied"
-anthropic-ratelimit-unified-7d-utilization  → util7d  (absent on non-Max plans)
-anthropic-ratelimit-unified-7d-reset        → Unix timestamp SECONDS (absent on non-Max plans)
+anthropic-ratelimit-unified-5h-utilization          → util5h              (float, e.g. "0.78")
+anthropic-ratelimit-unified-5h-reset                → Unix timestamp SECONDS (not ISO string)
+anthropic-ratelimit-unified-5h-status               → "allowed" or "denied"
+anthropic-ratelimit-unified-7d-utilization          → util7d              (absent on non-Max plans)
+anthropic-ratelimit-unified-7d-reset                → Unix timestamp SECONDS (absent on non-Max plans)
+anthropic-ratelimit-unified-7d-sonnet-utilization   → utilization7dSonnet (float 0.0–1.0; absent on non-Max plans)
+anthropic-ratelimit-unified-7d-sonnet-reset         → resetIn7dSonnet     Unix timestamp SECONDS (absent on non-Max plans)
+anthropic-ratelimit-unified-7d-sonnet-status        → fed into limitStatus ("allowed" / "denied")
 ```
 
 > **Important:** Reset headers are **Unix timestamps in seconds**, not ISO date strings.
-> The 7d headers are only present on Claude.ai Max plans; their absence means `has7dLimit = false`.
+> The 7d and 7d-sonnet headers are only present on Claude.ai Max plans; their absence means
+> `has7dLimit = false` / `has7dSonnetLimit = false`.
 
 ```typescript
 const nowSec = Date.now() / 1000
@@ -206,14 +210,35 @@ const resetIn7d = reset7dStr ? Math.max(0, parseInt(reset7dStr, 10) - nowSec) : 
 ```typescript
 let limitStatus: 'allowed' | 'allowed_warning' | 'denied'
 const status5h = response.headers.get('anthropic-ratelimit-unified-5h-status')
-if (status5h === 'denied') {
+const status7dSonnet = response.headers.get('anthropic-ratelimit-unified-7d-sonnet-status')
+if (status5h === 'denied' || status7dSonnet === 'denied') {
   limitStatus = 'denied'
-} else if (util5h >= 0.75 || (has7dLimit && util7d >= 0.75)) {
+} else if (util5h >= 0.75 || (has7dLimit && util7d >= 0.75) || (has7dSonnetLimit && utilization7dSonnet >= 0.75)) {
   limitStatus = 'allowed_warning'
 } else {
   limitStatus = 'allowed'
 }
 ```
+
+### RateLimitData Interface
+
+The object returned by `fetchRateLimitData()` and stored in the cache:
+
+```typescript
+interface RateLimitData {
+  utilization5h: number          // 0.0–1.0
+  utilization7d: number          // 0.0–1.0; 0 if no 7d limit
+  utilization7dSonnet: number    // 0.0–1.0; 0 if no Sonnet-specific 7d limit
+  resetIn5h: number              // seconds until 5h window resets
+  resetIn7d: number              // seconds until 7d window resets; 0 if no 7d limit
+  resetIn7dSonnet: number        // seconds until Sonnet 7d window resets; 0 if absent
+  limitStatus: 'allowed' | 'allowed_warning' | 'denied'
+  has7dLimit: boolean            // true only on Claude.ai Max plans
+  has7dSonnetLimit: boolean      // true when anthropic-ratelimit-unified-7d-sonnet-reset present
+}
+```
+
+---
 
 ### Credentials File
 
@@ -269,17 +294,19 @@ Non-`claude-ai` providers always use cost mode (no rate limit percentages).
 ~/.claude/vscode-claude-status-cache.json
 ```
 
-### Cache Schema (Version 2)
+### Cache Schema (Version 3)
 
 ```typescript
 interface CacheFile {
-  version: 2
+  version: 3
   updatedAt: string           // ISO datetime
   usageData: {
     utilization5h: number
     utilization7d: number
-    reset5hAt: number         // absolute Unix timestamp (seconds) — NOT relative seconds
-    reset7dAt: number         // 0 if no 7d limit (non-Max plan)
+    utilization7dSonnet: number  // 0 if no Sonnet-specific 7d limit (non-Max plan)
+    reset5hAt: number            // absolute Unix timestamp (seconds) — NOT relative seconds
+    reset7dAt: number            // 0 if no 7d limit (non-Max plan)
+    reset7dSonnetAt: number      // 0 if no Sonnet-specific 7d limit (non-Max plan)
     limitStatus: string
   }
 }
@@ -288,6 +315,8 @@ interface CacheFile {
 > **Schema version history:**
 > - v1: stored `resetIn5h`/`resetIn7d` as relative seconds from cache write time
 > - v2: stores `reset5hAt`/`reset7dAt` as absolute Unix timestamps (correct across cache reads)
+> - v3: adds `utilization7dSonnet` and `reset7dSonnetAt` for the Sonnet-only 7d rate limit window;
+>   backward compatible with v2 — missing fields default to `0`
 
 Cost and token data are NOT cached (always read from JSONL directly — it's local
 and fast). Only the API response values are cached.

@@ -9,6 +9,11 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Track Sonnet-only 7-day rate limit window — status bar (`S7d:`), tooltip, dashboard progress bar, and prediction engine
+- Model-filtered burn rate for accurate Sonnet-specific exhaustion prediction
+- Cache schema v3 with backward compatibility for v2
+
 ---
 
 ## [0.4.2] — 2026-03-15

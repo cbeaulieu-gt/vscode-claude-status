@@ -33,10 +33,12 @@ function buildI18n(): Record<string, string> {
     currentUsage:          t('Current Usage'),
     window5h:              t('5h window'),
     window7d:              t('7d window'),
+    window7dSonnet:        t('Sonnet 7d window'),
     tokenCost:             t('Token Cost'),
     today:                 t('Today'),
     days7:                 t('7 days'),
     days7short:            t('7d'),
+    days7dSonnetShort:     t('S7d'),
     days30:                t('30 days'),
     monthEst:              t('Month (est.)'),
     project:               t('Project'),
@@ -108,6 +110,7 @@ function buildI18n(): Record<string, string> {
     recWarning:         t('Less than 30 min remaining. Wrap up current task.'),
     recCritical:        t('Less than 10 min remaining. Save your work and pause.'),
     recRateLimitReached: t('Rate limit reached. Wait for reset.'),
+    recSonnetLimitReached: t('Sonnet limit reached. Switch model or wait for reset.'),
   };
 }
 
@@ -431,6 +434,15 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         <div class="progress-fill" id="usage-7d-fill" style="width:0%"></div>
       </div>
     </div>
+    <div class="progress-row" id="usage-7d-sonnet-row">
+      <div class="progress-labels">
+        <span>\${i18n.window7dSonnet}</span>
+        <span id="usage-7d-sonnet-label">—</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="usage-7d-sonnet-fill" style="width:0%"></div>
+      </div>
+    </div>
   </div>
 
   <div class="two-col">
@@ -571,10 +583,13 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
       const isClaudeAi = usage.providerType === 'claude-ai';
       const useCostMode = !isClaudeAi || usage.dataSource === 'local-only' || mode === 'cost';
       const show7d = usage.has7dLimit && isClaudeAi;
+      const show7dSonnet = usage.has7dSonnetLimit && isClaudeAi;
 
       // Show/hide 7d row
       const row7d = document.getElementById('usage-7d-row');
       if (row7d) { row7d.style.display = show7d ? '' : 'none'; }
+      const row7dSonnet = document.getElementById('usage-7d-sonnet-row');
+      if (row7dSonnet) { row7dSonnet.style.display = show7dSonnet ? '' : 'none'; }
 
       if (useCostMode) {
         const resetSuffix5h = isClaudeAi && usage.resetIn5h > 0
@@ -584,6 +599,10 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         if (show7d) {
           document.getElementById('usage-7d-label').textContent =
             '$' + usage.cost7d.toFixed(2) + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn7d);
+        }
+        if (show7dSonnet) {
+          document.getElementById('usage-7d-sonnet-label').textContent =
+            pct(usage.utilization7dSonnet) + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn7dSonnet);
         }
       } else {
         // percent mode — claude-ai only
@@ -595,6 +614,11 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
           const warn7d = usage.utilization7d >= 0.75 ? ' ⚠' : '';
           document.getElementById('usage-7d-label').textContent =
             pct(usage.utilization7d) + warn7d + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn7d);
+        }
+        if (show7dSonnet) {
+          const warnSonnet = usage.utilization7dSonnet >= 0.75 ? ' ⚠' : '';
+          document.getElementById('usage-7d-sonnet-label').textContent =
+            pct(usage.utilization7dSonnet) + warnSonnet + ' — ' + i18n.resetsIn + ' ' + fmt(usage.resetIn7dSonnet);
         }
       }
 
@@ -612,6 +636,12 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         const fill7d = document.getElementById('usage-7d-fill');
         fill7d.style.width = Math.min(100, usage.utilization7d * 100) + '%';
         fill7d.className = 'progress-fill' + (usage.utilization7d >= 0.75 ? ' warning' : '');
+      }
+
+      if (show7dSonnet) {
+        const fillSonnet = document.getElementById('usage-7d-sonnet-fill');
+        fillSonnet.style.width = Math.min(100, usage.utilization7dSonnet * 100) + '%';
+        fillSonnet.className = 'progress-fill' + (usage.utilization7dSonnet >= 0.75 ? ' warning' : '');
       }
 
       document.getElementById('cost-5h').textContent  = '$' + usage.cost5h.toFixed(2);
@@ -770,6 +800,7 @@ function getWebviewContent(nonce: string, i18n: Record<string, string>): string 
         'warning':            i18n.recWarning,
         'critical':           i18n.recCritical,
         'rate-limit-reached': i18n.recRateLimitReached,
+        'sonnet-limit-reached': i18n.recSonnetLimitReached,
       };
       const recText = recI18n[prediction.recommendationKey] || esc(prediction.recommendation);
       html += '<div class="prediction-row" style="margin-top:8px">💡 ' + recText + '</div>';

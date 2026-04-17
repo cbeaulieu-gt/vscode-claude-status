@@ -132,15 +132,19 @@ interface ClaudeUsageData {
   // From Anthropic API response headers (or cache)
   utilization5h: number        // 0.0–1.0
   utilization7d: number        // 0.0–1.0
+  utilization7dSonnet: number  // 0.0–1.0; Sonnet-only 7d window; 0 if absent
   resetIn5h: number            // seconds until 5h window resets
   resetIn7d: number            // seconds until 7d window resets
+  resetIn7dSonnet: number      // seconds until Sonnet 7d window resets; 0 if absent
   limitStatus: 'allowed' | 'allowed_warning' | 'denied'
   has7dLimit: boolean          // false on non-Max plans or non-claude-ai providers
+  has7dSonnetLimit: boolean    // true when Sonnet-specific 7d header is present
 
   // From local JSONL aggregation (always calculated from tokens — no costUSD field)
   cost5h: number               // USD
   costDay: number              // USD
   cost7d: number               // USD
+  costSonnet7d: number         // USD — Sonnet-model entries only, last 7d window
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number
@@ -189,6 +193,11 @@ interface PredictionData {
   safeToStartHeavyTask: boolean
   recommendation: string                // human-readable advice
 }
+
+// Note: the prediction engine computes two exhaustion estimates — one against the
+// 5h window (using overall burn rate) and one against the Sonnet-only 7d window
+// (using a model-filtered burn rate derived from Sonnet-only JSONL entries).
+// The earlier of the two times is surfaced to the user.
 
 // Heatmap
 interface HeatmapData {

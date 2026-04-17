@@ -19,6 +19,7 @@ interface JsonlEntry {
   timestamp: string
   cwd?: string
   message?: {
+    model?: string
     usage?: TokenUsage
   }
 }
@@ -27,6 +28,7 @@ export interface AggregatedUsage {
   cost5h: number
   costDay: number
   cost7d: number
+  costSonnet7d: number
   tokensIn5h: number
   tokensOut5h: number
   tokensCacheRead5h: number
@@ -126,6 +128,7 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
     cost5h: 0,
     costDay: 0,
     cost7d: 0,
+    costSonnet7d: 0,
     tokensIn5h: 0,
     tokensOut5h: 0,
     tokensCacheRead5h: 0,
@@ -146,6 +149,11 @@ export async function readAllUsage(pricing: TokenPricing = DEFAULT_PRICING): Pro
       const age = now - ts;
       if (age <= window7d) {
         result.cost7d += cost;
+        // Accumulate Sonnet-only 7d cost for prediction
+        const model = entry.message?.model ?? '';
+        if (model.toLowerCase().includes('sonnet')) {
+          result.costSonnet7d += cost;
+        }
       }
       if (ts >= startOfToday.getTime()) {
         result.costDay += cost;
